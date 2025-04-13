@@ -15,6 +15,7 @@ target_link_libraries(${PROJECT_NAME} PRIVATE
     pico_async_context_freertos
     FreeRTOS-Kernel-Heap4
     pico_stdlib
+    hardware_pwm
 )
 
 if (NOT TARGET tinyusb_device)
