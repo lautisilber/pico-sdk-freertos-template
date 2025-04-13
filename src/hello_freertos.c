@@ -1,14 +1,23 @@
 #include <stdio.h>
 #include "pico/stdlib.h"
+#include "pico/multicore.h"
 #include "FreeRTOS.h"
 #include "task.h"
+#include "semphr.h"
 
 #define LED_PIN 25
 
-void hello_task(void *params) {
+void print_task_1(void *params) {
     while (1) {
-        printf("Hello, from FreeRTOS\n");
+        printf("Hello from Task 1 on core %u\n", get_core_num());
         vTaskDelay(pdMS_TO_TICKS(1000));
+    }
+}
+
+void print_task_2(void *params) {
+    while (1) {
+        printf("Hello from Task 2 on core %u\n", get_core_num());
+        vTaskDelay(pdMS_TO_TICKS(1300));
     }
 }
 
@@ -26,21 +35,20 @@ int main() {
     gpio_init(LED_PIN);
     gpio_set_dir(LED_PIN, GPIO_OUT);
 
-    // Give the tasks a core affinity if SMP is enabled
-    #if ( configNUM_CORES > 1 ) && ( configUSE_CORE_AFFINITY == 1 )
-    TaskHandle_t hello_handle, led_handle;
+    // Handles to set core affinity
+    TaskHandle_t handle1, handle2, blink_handle;
 
-    xTaskCreate(hello_task, "HelloTask", 256, NULL, 1, &hello_handle);
-    xTaskCreate(led_blink_task, "BlinkTask", 256, NULL, 1, &led_handle);
+    // Create tasks
+    xTaskCreate(print_task_1, "Print1", 256, NULL, 1, &handle1);
+    xTaskCreate(print_task_2, "Print2", 256, NULL, 1, &handle2);
+    xTaskCreate(led_blink_task, "Blink", 256, NULL, 1, &blink_handle);
 
-    // Pin tasks to different cores
-    vTaskCoreAffinitySet(hello_handle, (1 << 0)); // Core 0
-    vTaskCoreAffinitySet(led_handle, (1 << 1));   // Core 1
-
-    #else
-    xTaskCreate(hello_task, "HelloTask", 256, NULL, 1, NULL);
-    xTaskCreate(led_blink_task, "BlinkTask", 256, NULL, 1, NULL);
-    #endif
+    // Pin print_task_1 to core 0
+    vTaskCoreAffinitySet(handle1, (1 << 0));
+    // Pin print_task_2 to core 1
+    vTaskCoreAffinitySet(handle2, (1 << 1));
+    // Let the LED task run on either core
+    vTaskCoreAffinitySet(blink_handle, (1 << 0) | (1 << 1));
 
     vTaskStartScheduler();
 
